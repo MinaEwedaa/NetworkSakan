@@ -92,17 +92,22 @@ def packet_handler(pkt):
     src = pkt[Ether].src.upper()
     dst = pkt[Ether].dst.upper()
     ln  = len(pkt)
-    if dst == "FF:FF:FF:FF:FF:FF" or dst.startswith("01:"):
+    # Ignore broadcast, multicast (IPv4 & IPv6), and loopback
+    if dst == "FF:FF:FF:FF:FF:FF" or dst.startswith("01:") or dst.startswith("33:33"):
+        return
+    if src == "FF:FF:FF:FF:FF:FF" or src.startswith("01:") or src.startswith("33:33"):
         return
     with _counter_lock:
-        if src != HOTSPOT_MAC and not src.startswith("FF"):
+        if src != HOTSPOT_MAC:
             _counters[src]["bytes_out"] += ln
             _counters[src]["pkts_out"]  += 1
             if pkt.haslayer(IP) and pkt[IP].src.startswith(HOTSPOT_SUBNET):
                 _counters[src]["ip"] = pkt[IP].src
-        if dst != HOTSPOT_MAC and not dst.startswith("FF"):
+        if dst != HOTSPOT_MAC:
             _counters[dst]["bytes_in"] += ln
             _counters[dst]["pkts_in"]  += 1
+            if pkt.haslayer(IP) and pkt[IP].dst.startswith(HOTSPOT_SUBNET):
+                _counters[dst]["ip"] = pkt[IP].dst
 
 def start_capture(iface):
     from scapy.all import sniff
@@ -120,6 +125,8 @@ def flush_counters():
     ts    = now()
     today = date.today().isoformat()
     for mac, d in snap.items():
+        if mac == "FF:FF:FF:FF:FF:FF" or mac.startswith("01:") or mac.startswith("33:33"):
+            continue
         conn.execute("""
             INSERT INTO bandwidth_realtime (ts,mac,ip,bytes_in,bytes_out,pkts_in,pkts_out)
             VALUES (?,?,?,?,?,?,?)
@@ -130,8 +137,23 @@ def flush_counters():
                 bytes_in  = bytes_in  + excluded.bytes_in,
                 bytes_out = bytes_out + excluded.bytes_out
         """, (today, mac, d["bytes_in"], d["bytes_out"]))
-        conn.execute("UPDATE devices SET last_seen=?,ip=?,is_online=1 WHERE mac=?",
-            (ts, d["ip"], mac))
+
+        # Ensure device exists in devices table even if ARP sweep hasn't completed
+        row = conn.execute("SELECT mac FROM devices WHERE mac=?", (mac,)).fetchone()
+        if row is None:
+            vendor = lookup_vendor(mac)
+            conn.execute("""
+                INSERT INTO devices (mac,ip,hostname,vendor,first_seen,last_seen,is_online)
+                VALUES (?,?,?,?,?,?,1)
+            """, (mac, d["ip"], None, vendor, ts, ts))
+            print(f"[!] NEW DEVICE VIA PACKET: {mac} ({d['ip']}) — {vendor}")
+        else:
+            if d["ip"]:
+                conn.execute("UPDATE devices SET last_seen=?,ip=?,is_online=1 WHERE mac=?",
+                    (ts, d["ip"], mac))
+            else:
+                conn.execute("UPDATE devices SET last_seen=?,is_online=1 WHERE mac=?",
+                    (ts, mac))
     conn.commit(); conn.close()
 
 # ── ARP scan ──────────────────────────────────────────────────────────────────
@@ -156,21 +178,34 @@ def arp_scan():
     for i in range(1, 255):
         t = threading.Thread(
             target=lambda ip=f"{HOTSPOT_SUBNET}.{i}": subprocess.run(
-                ["ping","-n","1","-w","300",ip], capture_output=True, timeout=1),
+                ["ping","-n","1","-w","200",ip], capture_output=True, timeout=1),
             daemon=True)
         threads.append(t); t.start()
-    for t in threads: t.join(timeout=2)
+    for t in threads: t.join(timeout=1.5)
+
     result  = subprocess.run(["arp","-a"], capture_output=True, text=True)
-    pattern = re.compile(r'(192\.168\.137\.\d+)\s+([\da-f-]+)\s+dynamic', re.I)
-    found   = [(m.group(1), m.group(2).replace("-",":").upper())
-               for m in pattern.finditer(result.stdout)
-               if not m.group(2).startswith("ff")]
+    # Match both dynamic and static/permanent ARP entries
+    pattern = re.compile(r'(192\.168\.137\.\d+)\s+([\da-f-]+)\s+(?:dynamic|static|permanent)', re.I)
+    found   = []
+    for m in pattern.finditer(result.stdout):
+        ip  = m.group(1)
+        mac = m.group(2).replace("-",":").upper()
+        if mac.startswith("FF") or mac.startswith("01") or mac.startswith("33:33"):
+            continue
+        if ip.endswith(".1") or ip.endswith(".255"):
+            continue
+        found.append((ip, mac))
+
     print(f"[SCAN] {len(found)} devices on hotspot")
     upsert_devices(found)
 
 def upsert_devices(found):
     conn = db(); ts = now()
-    conn.execute("UPDATE devices SET is_online=0")
+    # Mark devices offline only if not seen recently (> 3 minutes)
+    conn.execute("""
+        UPDATE devices SET is_online=0
+        WHERE last_seen < datetime('now', '-3 minutes')
+    """)
     for ip, mac in found:
         hostname = resolve_hostname(ip)
         row = conn.execute("SELECT mac FROM devices WHERE mac=?", (mac,)).fetchone()
