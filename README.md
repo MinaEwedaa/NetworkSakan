@@ -1,34 +1,42 @@
-# 🌐 Karakery Monitor (مراقب شبكة كراكيري)
+# 🌐 Karakery Monitor (NetworkSakan - مراقب شبكة كراكيري)
 
-> **Zero-cost, per-device bandwidth and network monitor for shared student housing, dorms, and roommates.**  
-> Monitor who is using the quota in real-time without purchasing any hardware or expensive managed routers.
+> **Zero-cost, real-time per-device bandwidth and network monitor for shared apartments, student housing ("Sakan"), and dorms.**  
+> Know exactly who is consuming your shared internet quota without purchasing expensive routers, managed switches, or Raspberry Pis.
 
 ---
 
 ## 📌 Problem & Motivation
 
-In shared student housing or apartments ("Sakan"), internet quotas are often shared and limited (e.g., Telecom Egypt / WE, Vodafone, Orange). When the quota finishes in 10 days, nobody knows who consumed the gigabytes. 
+In shared student housing or apartments in Egypt and across the region, internet quotas (Telecom Egypt / WE, Vodafone, Orange, Etisalat) are shared, expensive, and limited. When 140 GB or 250 GB finishes in 10 days, nobody knows who consumed the gigabytes.
 
-Traditional solutions require:
-- Buying expensive routers with per-IP bandwidth monitoring.
-- Flashing custom firmware like OpenWrt / DD-WRT (often unsupported by ISP-locked VDSL routers).
-- Purchasing dedicated mini-PCs or Raspberry Pis.
+Traditional network monitoring solutions require:
+- Buying expensive routers with per-device bandwidth tracking and QoS.
+- Flashing custom firmware like OpenWrt / DD-WRT (unsupported by most ISP-locked VDSL routers like HG630 / DG8045).
+- Buying dedicated hardware like Raspberry Pis or managed switches.
 
-**NetworkSakan solves this with $0 cost:**  
-By turning your Windows laptop into a transparent Wi-Fi gateway using Windows Mobile Hotspot, all traffic from connected roommates flows through your laptop. NetworkSakan sniffs and accounts for every byte per device in real-time and displays it on a dashboard.
+**Karakery Monitor solves this for $0:**  
+By turning your Windows laptop into a transparent Wi-Fi gateway using Windows Mobile Hotspot, all internet traffic from connected roommates flows directly through your laptop. Karakery Monitor sniffs raw packets on the hotspot interface in real-time, tallies every byte downloaded and uploaded per device, and serves a live web dashboard.
 
 ---
 
 ## ✨ Features
 
 - 📊 **Real-time Per-Device Bandwidth:** Live download & upload tracking per device MAC address.
-- 📱 **Automatic Device Discovery:** Detects connected phones, laptops, and tablets via ARP sweep + Wi-Fi Direct interface monitoring.
-- 🏷️ **Custom Device Nicknames:** Assign friendly names (e.g., *"Ahmed's iPhone"*, *"Omar's Laptop"*) directly from the UI.
+- 🟢 **Live Auto-Refresh & Disconnect Handling:**
+  - Auto-refreshes every 2 seconds.
+  - **Connected Only Tab:** Active devices only; automatically drops disconnected devices in real time.
+  - **All Devices Tab:** Full history with "last active" relative timers (`active now`, `15s ago`, `35m ago`).
+  - **Delete / Purge Button (🗑️):** Clean up old or guest devices from history.
+- ⚡ **Dual Detection Engine:**
+  - **Packet Sniffing Auto-Registration:** Instantly registers any device sending/receiving traffic through the hotspot, even before an ARP scan finishes.
+  - **Full ARP & Neighbor Discovery:** Supports both `dynamic` and `static`/`permanent` leases assigned by Windows ICS / Mobile Hotspot.
+- 🏷️ **Custom Device Nicknames:** Assign friendly labels (e.g., *"Ahmed's iPhone"*, *"Omar's Laptop"*) directly from the UI.
 - 🏢 **OUI Hardware Vendor Identification:** Identifies manufacturer (Apple, Samsung, Intel, Xiaomi, etc.) automatically.
+- 🚫 **Multicast Filtering:** Automatically filters out IPv4 (`01:...`) and IPv6 (`33:33:...`) multicast traffic to eliminate ghost/phantom entries.
 - 📈 **Daily Usage & Trends:** Track daily historical consumption per device to split the internet bill fairly.
+- 📱 **Mobile-Friendly UI:** Open the dashboard directly on your phone or tablet at `http://192.168.137.1:5000`.
 - 📥 **CSV Export:** Download bandwidth usage reports with one click for easy quota auditing.
 - 🔔 **New Device Alerts:** Notifies you immediately when an unrecognized device connects.
-- 🎨 **Modern Dark Web Dashboard:** Clean interface at `http://localhost:5000` with Chart.js visualization.
 
 ---
 
@@ -48,11 +56,11 @@ Roommate 1      Roommate 2 ...
     │               │
     └───────┬───────┘
             ▼
-[Npcap Packet Sniffer (Scapy)]
+[Npcap Packet Sniffer (Scapy)]  ─── Captures raw Ethernet/IP frames
             │
-      [SQLite DB]
+      [SQLite DB]               ─── Aggregates realtime & daily totals
             │
-[Flask REST API & Dashboard] (http://localhost:5000)
+[Flask REST API & Dashboard]    ─── Serves UI at http://localhost:5000
 ```
 
 ---
@@ -60,9 +68,9 @@ Roommate 1      Roommate 2 ...
 ## 🚀 Quick Start
 
 ### Prerequisites
-1. **Windows 10 or 11** with Wi-Fi adapter.
+1. **Windows 10 or 11** with a Wi-Fi adapter.
 2. **Python 3.10+** installed and added to PATH.
-3. **Npcap**: Download and install [Npcap](https://npcap.com/#download) with default settings (required for raw packet capture).
+3. **Npcap**: Download and install [Npcap](https://npcap.com/#download) with default settings (required for Windows packet sniffing).
 
 ---
 
@@ -84,8 +92,8 @@ Roommate 1      Roommate 2 ...
    - Turn it **ON** (set "Share my internet connection from: Wi-Fi").
    - Share network name & password with your roommates.
 
-4. **Launch NetworkSakan:**
-   - Double-click **`start.bat`** (or right-click → Run as Administrator),  
+4. **Launch Karakery Monitor:**
+   - Double-click **`start.bat`** (it will automatically request Administrator privileges needed for raw packet capture).  
    *OR* run manually in two terminals:
 
    **Terminal 1 (Administrator for packet capture):**
@@ -99,23 +107,42 @@ Roommate 1      Roommate 2 ...
    ```
 
 5. **Open Dashboard:**  
-   Navigate to **[http://localhost:5000](http://localhost:5000)** in your browser.
+   - On your laptop: **[http://localhost:5000](http://localhost:5000)**
+   - On any phone connected to the hotspot: **`http://192.168.137.1:5000`**
+
+---
+
+## 🌐 Remote Access (Outside the House)
+
+Since Karakery Monitor sniffs physical network traffic passing through your laptop adapter, it runs locally on your machine (it cannot run on serverless cloud hosts like Vercel).
+
+If you want a free, secure public link to check the dashboard from outside the house:
+
+1. Install Cloudflare Tunnel:
+   ```powershell
+   winget install Cloudflare.cloudflared
+   ```
+2. Start tunnel:
+   ```powershell
+   cloudflared tunnel --url http://localhost:5000
+   ```
+3. Open the generated `https://....trycloudflare.com` URL anywhere on your phone!
 
 ---
 
 ## 🛠️ Tech Stack
 
 - **Backend:** Python 3, Flask, Scapy, SQLite3, psutil, schedule
-- **Capture Engine:** Npcap (WinPcap-compatible NDIS 6 driver)
+- **Capture Engine:** Npcap (NDIS 6 packet capture driver)
 - **Frontend:** Vanilla HTML5, CSS3 (Modern Dark Theme), Chart.js
-- **Protocols:** Ethernet/IP packet inspection, ARP active scan, OUI API
+- **Protocols:** Ethernet/IP packet inspection, ARP active sweep, Windows Neighbor Cache, OUI API
 
 ---
 
 ## 🔒 Security & Privacy
 
-- NetworkSakan operates **locally on your machine**.
-- Packet payload data is **not inspected or stored**; only byte lengths, protocol headers, and source/destination MAC/IP addresses are counted for bandwidth aggregation.
+- Karakery Monitor operates **100% locally on your machine**.
+- Packet contents/payloads are **never inspected, parsed, or stored**; only byte lengths, protocol headers, and source/destination MAC/IP addresses are tallied for quota measurement.
 - The SQLite database (`netmon.db`) remains entirely local and is excluded from git commits.
 
 ---
