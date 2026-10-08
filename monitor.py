@@ -13,7 +13,7 @@ import requests, psutil, schedule
 # ── Config ────────────────────────────────────────────────────────────────────
 HOTSPOT_SUBNET = "192.168.137"   # Windows Mobile Hotspot default
 DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "netmon.db")
-SCAN_INTERVAL  = 30
+SCAN_INTERVAL  = 15
 
 # ── Per-device byte counters (RAM, flushed to DB every 10s) ──────────────────
 _counters     = collections.defaultdict(lambda: {"bytes_in":0,"bytes_out":0,
@@ -200,12 +200,18 @@ def arp_scan():
     upsert_devices(found)
 
 def upsert_devices(found):
+    from datetime import timedelta
     conn = db(); ts = now()
-    # Mark devices offline only if not seen recently (> 3 minutes)
-    conn.execute("""
-        UPDATE devices SET is_online=0
-        WHERE last_seen < datetime('now', '-3 minutes')
-    """)
+    found_macs = set(mac for _, mac in found)
+
+    # Cutoff in local time: if not found in current scan and no packet in last 45s, mark offline
+    cutoff = (datetime.now() - timedelta(seconds=45)).strftime("%Y-%m-%d %H:%M:%S")
+    for row in conn.execute("SELECT mac, last_seen FROM devices").fetchall():
+        d_mac = row["mac"]
+        d_ls  = row["last_seen"]
+        if d_mac not in found_macs and (not d_ls or d_ls < cutoff):
+            conn.execute("UPDATE devices SET is_online=0 WHERE mac=?", (d_mac,))
+
     for ip, mac in found:
         hostname = resolve_hostname(ip)
         row = conn.execute("SELECT mac FROM devices WHERE mac=?", (mac,)).fetchone()
