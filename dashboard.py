@@ -125,7 +125,7 @@ HTML = """
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Network Monitor</title>
+<title>Karakery Monitor</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
   :root {
@@ -207,7 +207,7 @@ HTML = """
 <body>
 
 <header>
-  <h1>🌐 <span>Network</span> Monitor</h1>
+  <h1>🌐 <span>Karakery</span> Monitor</h1>
   <div style="display:flex;gap:12px;align-items:center">
     <span id="refresh-indicator">Refreshing...</span>
     <a href="/api/export/csv" class="export-btn">⬇ Export CSV</a>

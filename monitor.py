@@ -243,7 +243,7 @@ def collect_host_bandwidth():
 # ── Main ──────────────────────────────────────────────────────────────────────
 if __name__ == "__main__":
     print("="*60)
-    print("  Network Monitor  —  run as Administrator")
+    print("  Karakery Monitor  —  run as Administrator")
     print(f"  DB: {DB_PATH}")
     print("="*60)
     init_db()

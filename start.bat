@@ -1,7 +1,7 @@
 @echo off
-title NetworkSakan Launcher
+title Karakery Monitor Launcher
 echo ======================================================
-echo           NetworkSakan - Bandwidth Monitor
+echo           Karakery Monitor - Bandwidth Monitor
 echo ======================================================
 echo.
 
@@ -19,18 +19,18 @@ echo [*] Installing dependencies if needed...
 python -m pip install -r requirements.txt
 
 echo [*] Starting Web Dashboard (http://localhost:5000)...
-start "NetworkSakan Dashboard" python dashboard.py
+start "Karakery Monitor Dashboard" python dashboard.py
 
 echo [*] Starting Packet Monitor Daemon...
 timeout /t 2 /nobreak >nul
-start "NetworkSakan Monitor" python monitor.py
+start "Karakery Monitor Daemon" python monitor.py
 
 timeout /t 2 /nobreak >nul
 echo [*] Opening Dashboard in browser...
 start http://localhost:5000
 
 echo.
-echo [OK] NetworkSakan is running!
+echo [OK] Karakery Monitor is running!
 echo Keep the terminal windows open or minimize them.
 echo Dashboard is available at: http://localhost:5000
 echo.
