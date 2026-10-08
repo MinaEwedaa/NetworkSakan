@@ -1,0 +1,25 @@
+# SQLite databases (runtime data)
+*.db
+*.db-journal
+*.sqlite
+netmon.db
+
+# Python bytecode & cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+env/
+
+# IDE & Editor configs
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs
+*.log
