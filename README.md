@@ -1,4 +1,4 @@
-# 🌐 Karakery Monitor (NetworkSakan - مراقب شبكة كراكيري)
+# 🌐 Karakery Monitor (NetworkSakan )
 
 > **Zero-cost, real-time per-device bandwidth and network monitor for shared apartments, student housing ("Sakan"), and dorms.**  
 > Know exactly who is consuming your shared internet quota without purchasing expensive routers, managed switches, or Raspberry Pis.
